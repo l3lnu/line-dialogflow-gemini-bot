@@ -18,10 +18,12 @@ fs.writeFileSync(serviceAccountPath, Buffer.from(serviceAccountBase64, 'base64')
 const sessionClient = new SessionsClient({ keyFilename: serviceAccountPath });
 
 async function askGemini(prompt) {
-  const res = await axios.post(
-    `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
-    { contents: [{ parts: [{ text: prompt }] }] }
-  );
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const payload = {
+    contents: [{ parts: [{ text: prompt }] }]
+  };
+
+  const res = await axios.post(url, payload);
   return res.data.candidates?.[0]?.content?.parts?.[0]?.text || 'ขออภัย ไม่สามารถตอบคำถามนี้ได้';
 }
 
