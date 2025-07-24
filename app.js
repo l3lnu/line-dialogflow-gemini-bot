@@ -1,3 +1,14 @@
+const fs = require('fs');
+const path = require('path');
+
+// Decode service account from ENV
+const serviceAccountBase64 = process.env.DIALOGFLOW_CREDENTIALS;
+const serviceAccountPath = path.join(__dirname, 'service-account.json');
+
+fs.writeFileSync(serviceAccountPath, Buffer.from(serviceAccountBase64, 'base64').toString());
+
+const sessionClient = new SessionsClient({ keyFilename: serviceAccountPath });
+
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
