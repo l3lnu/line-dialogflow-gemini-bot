@@ -19,7 +19,7 @@ const sessionClient = new SessionsClient({ keyFilename: serviceAccountPath });
 
 async function askGemini(prompt) {
   const res = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
     { contents: [{ parts: [{ text: prompt }] }] }
   );
   return res.data.candidates?.[0]?.content?.parts?.[0]?.text || 'ขออภัย ไม่สามารถตอบคำถามนี้ได้';
