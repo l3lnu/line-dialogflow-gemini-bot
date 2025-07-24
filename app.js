@@ -1,61 +1,44 @@
-const express = require("express");
+require('dotenv').config();
+const express = require('express');
+const axios = require('axios');
+const { SessionsClient } = require('@google-cloud/dialogflow');
 const app = express();
-const port = process.env.PORT || 3001;
+app.use(express.json());
 
-app.get("/", (req, res) => res.type('html').send(html));
+const { LINE_TOKEN, DIALOGFLOW_PROJECT_ID, GEMINI_API_KEY } = process.env;
 
-const server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
+// Gemini helper
+async function askGemini(prompt) {
+  const res = await axios.post(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+    { contents: [{ parts: [{ text: prompt }] }] }
+  );
+  return res.data.candidates?.[0]?.content?.parts?.[0]?.text || 'ขอโทษครับ ไม่ทราบคำตอบตอนนี้';
+}
 
-server.keepAliveTimeout = 120 * 1000;
-server.headersTimeout = 120 * 1000;
+app.post('/webhook', async (req, res) => {
+  for (const e of req.body.events) {
+    if (e.type === 'message' && e.message.type === 'text') {
+      const msg = e.message.text;
+      const session = new SessionsClient();
+      const sessionPath = session.projectAgentSessionPath(DIALOGFLOW_PROJECT_ID, e.source.userId);
+      const dfReq = { session: sessionPath, queryInput: { text: { text: msg, languageCode: 'th' } } };
+      const dfRes = await session.detectIntent(dfReq);
+      const intent = dfRes[0].queryResult.intent.displayName;
+      let reply = dfRes[0].queryResult.fulfillmentText;
 
-const html = `
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Hello from Render!</title>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
-    <script>
-      setTimeout(() => {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
-          disableForReducedMotion: true
-        });
-      }, 500);
-    </script>
-    <style>
-      @import url("https://p.typekit.net/p.css?s=1&k=vnd5zic&ht=tk&f=39475.39476.39477.39478.39479.39480.39481.39482&a=18673890&app=typekit&e=css");
-      @font-face {
-        font-family: "neo-sans";
-        src: url("https://use.typekit.net/af/00ac0a/00000000000000003b9b2033/27/l?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n7&v=3") format("woff2"), url("https://use.typekit.net/af/00ac0a/00000000000000003b9b2033/27/d?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n7&v=3") format("woff"), url("https://use.typekit.net/af/00ac0a/00000000000000003b9b2033/27/a?primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&fvd=n7&v=3") format("opentype");
-        font-style: normal;
-        font-weight: 700;
+      if (intent === 'Default Fallback Intent' || intent.includes('health')) {
+        reply = await askGemini(msg);
       }
-      html {
-        font-family: neo-sans;
-        font-weight: 700;
-        font-size: calc(62rem / 16);
-      }
-      body {
-        background: white;
-      }
-      section {
-        border-radius: 1em;
-        padding: 1em;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        margin-right: -50%;
-        transform: translate(-50%, -50%);
-      }
-    </style>
-  </head>
-  <body>
-    <section>
-      Hello from Render!
-    </section>
-  </body>
-</html>
-`
+
+      await axios.post(
+        'https://api.line.me/v2/bot/message/reply',
+        { replyToken: e.replyToken, messages: [{ type: 'text', text: reply }] },
+        { headers: { Authorization: `Bearer ${LINE_TOKEN}` } }
+      );
+    }
+  }
+  res.sendStatus(200);
+});
+
+app.listen(process.env.PORT || 3000);
