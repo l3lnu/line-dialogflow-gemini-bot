@@ -52,7 +52,13 @@ app.post('/webhook', async (req, res) => {
       let reply = dfRes[0].queryResult.fulfillmentText;
 
       if (intent === 'Default Fallback Intent' || intent.includes('health')) {
-        reply = await askGemini(msg);
+        const prompt = `
+          คุณคือผู้ช่วยแชทที่ตอบคำถามเกี่ยวกับสุขภาพและผลิตภัณฑ์อาหารเสริมจากหมอบุญชัยเท่านั้น
+          กรุณาตอบโดยใช้ภาษาไทยธรรมดา ห้ามใช้สัญลักษณ์ ** หรือ * และอย่าเว้นวรรคพิเศษ
+          
+          คำถาม: ${msg}
+          `;
+        reply = await askGemini(prompt);
       }
 
       await axios.post(
