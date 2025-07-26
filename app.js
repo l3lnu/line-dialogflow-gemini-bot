@@ -62,8 +62,8 @@ app.post('/webhook', async (req, res) => {
 
       const dfRes = await sessionClient.detectIntent(dfReq);
       const result = dfRes[0].queryResult;
-      const intent = result.intent.displayName;
-      let reply;
+      const intent = result.intent?.displayName || '';
+      let reply = result.fulfillmentText || '';
 
       if (intent === 'user_selects_1') {
         // Use Dialogflow fulfillment text
