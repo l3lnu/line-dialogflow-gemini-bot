@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { SessionsClient } = require('@google-cloud/dialogflow');
+const products = require('./products');
 
 const app = express();
 app.use(express.json());
@@ -31,6 +32,14 @@ async function askGemini(prompt) {
   return res.data.candidates?.[0]?.content?.parts?.[0]?.text || 'ขออภัย ไม่สามารถตอบคำถามนี้ได้';
 }
 
+function getProductAnswer(product, detail) {
+  const productData = products[product];
+  if (productData && productData[detail]) {
+    return productData[detail];
+  }
+  return null;
+}
+
 // LINE Webhook
 app.post('/webhook', async (req, res) => {
   for (const e of req.body.events) {
@@ -41,7 +50,6 @@ app.post('/webhook', async (req, res) => {
 
       // If user selected "talk to human"
       if (pausedUsers.has(userId)) {
-        // Don’t reply if user is paused
         continue;
       }
 
@@ -66,17 +74,42 @@ app.post('/webhook', async (req, res) => {
       let reply = result.fulfillmentText || '';
 
       console.log(JSON.stringify(result, null, 2));
-      
+
       if (intent === 'user_selects_1') {
-        // Use Dialogflow fulfillment text
+        // Intent 1: ถามข้อมูลผลิตภัณฑ์แบบมีขั้นตอน
         reply = result.fulfillmentText;
+
+      } else if (intent === 'user_smart_product_question') {
+        // New smart intent: ผู้ใช้พิมพ์คำถามเต็ม เช่น "อะมิโนพลัสใช้งานยังไง"
+        const params = result.parameters?.fields || {};
+        const product = params.product?.stringValue || '';
+        const detail = params.detail_type?.stringValue || '';
+
+        const productReply = getProductAnswer(product, detail);
+
+        if (productReply) {
+          reply = productReply;
+        } else {
+          // Let Gemini help
+          const prompt = `
+คุณคือผู้ช่วยแชทที่ตอบคำถามเกี่ยวกับสุขภาพและผลิตภัณฑ์อาหารเสริมจากหมอบุญชัยเท่านั้น
+นี่คือฐานข้อมูล:
+${JSON.stringify(products, null, 2)}
+
+คำถาม: ${msg}
+ตอบ:
+          `.trim();
+          reply = await askGemini(prompt);
+        }
 
       } else if (intent === 'user_selects_2') {
         const prompt = `
 คุณคือผู้ช่วยแชทที่ตอบคำถามเกี่ยวกับสุขภาพและผลิตภัณฑ์อาหารเสริมจากหมอบุญชัยเท่านั้น
-กรุณาตอบโดยใช้ภาษาไทยธรรมดา ห้ามใช้สัญลักษณ์ ** หรือ * และอย่าเว้นวรรคพิเศษ
+นี่คือฐานข้อมูล:
+${JSON.stringify(products, null, 2)}
 
 คำถาม: ${msg}
+ตอบ:
         `.trim();
         reply = await askGemini(prompt);
 
@@ -85,7 +118,6 @@ app.post('/webhook', async (req, res) => {
         reply = 'ทีมงานจะติดต่อคุณเร็ว ๆ นี้ค่ะ';
 
       } else {
-        // Fallback or anything else
         reply = result.fulfillmentText || 'ขออภัย ฉันไม่เข้าใจคำถาม กรุณาเลือกจากเมนู 1-3';
       }
 
