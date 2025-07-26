@@ -65,6 +65,8 @@ app.post('/webhook', async (req, res) => {
       const intent = result.intent?.displayName || '';
       let reply = result.fulfillmentText || '';
 
+      console.log(JSON.stringify(result, null, 2));
+      
       if (intent === 'user_selects_1') {
         // Use Dialogflow fulfillment text
         reply = result.fulfillmentText;
